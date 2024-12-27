@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diffie-Hellman Key Exchange</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Diffie-Hellman Key Exchange</h1>
+
+        <label for="p">Enter Prime Number (p):</label>
+        <input type="number" id="p" placeholder="Enter a prime number">
+
+        <label for="a">Alice's Private Key (a):</label>
+        <input type="number" id="a" placeholder="Enter Alice's private key">
+
+        <label for="b">Bob's Private Key (b):</label>
+        <input type="number" id="b" placeholder="Enter Bob's private key">
+
+        <button onclick="processDiffieHellman()">Compute Keys</button>
+
+        <div id="output" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Fungsi untuk memeriksa apakah sebuah angka adalah bilangan prima
+        function isPrime(num) {
+            if (num < 2) return false;
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) return false;
+            }
+            return true;
+        }
+
+        // Fungsi untuk menemukan akar primitif dari bilangan prima p
+        function findPrimitiveRoot(p) {
+            const randomG = Math.floor(Math.random() * (p - 2)) + 2; // Pilih kandidat random
+            return isPrimitiveRoot(randomG, p) ? randomG : findPrimitiveRoot(p); // Validasi kandidat
+        }
+
+        // Fungsi untuk memeriksa apakah g adalah akar primitif dari p
+        function isPrimitiveRoot(g, p) {
+            const seen = new Set();
+            let value = 1;
+            for (let i = 0; i < p - 1; i++) {
+                value = (value * g) % p; // Modulo p
+                if (seen.has(value)) return false; // Jika nilai sudah muncul, bukan akar primitif
+                seen.add(value);
+            }
+            return true;
+        }
+
+        // Fungsi untuk menghitung eksponen modular: (base^exp) % mod
+        function modExp(base, exp, mod) {
+            let result = 1;
+            base = base % mod;
+            while (exp > 0) {
+                if (exp % 2 === 1) result = (result * base) % mod; // Jika eksponen ganjil
+                exp = Math.floor(exp / 2); // Eksponen dibagi 2
+                base = (base * base) % mod; // Basis dikuadratkan
+            }
+            return result;
+        }
+
+        // Fungsi utama untuk menjalankan algoritma Diffie-Hellman
+        function processDiffieHellman() {
+            const p = parseInt(document.getElementById('p').value); // Input bilangan prima (p)
+            const a = parseInt(document.getElementById('a').value); // Kunci privat Alice (a)
+            const b = parseInt(document.getElementById('b').value); // Kunci privat Bob (b)
+
+            // Langkah 1: Validasi input
+            if (!p || !isPrime(p)) {
+                alert('Please enter a valid prime number for p.');
+                return;
+            }
+            if (!a || !b) {
+                alert('Please enter private keys for both Alice and Bob.');
+                return;
+            }
+
+            // Langkah 2: Temukan akar primitif g dari bilangan prima p
+            const g = findPrimitiveRoot(p);
+
+            // Langkah 3: Alice menghitung kunci publiknya (A)
+            const A = modExp(g, a, p);
+
+            // Langkah 4: Bob menghitung kunci publiknya (B)
+            const B = modExp(g, b, p);
+
+            // Langkah 5: Alice dan Bob menghitung kunci simetris bersama (K)
+            const K_alice = modExp(B, a, p); // Alice menghitung K menggunakan B
+            const K_bob = modExp(A, b, p);  // Bob menghitung K menggunakan A
+
+            // Langkah 6: Tampilkan hasil
+            const outputDiv = document.getElementById('output');
+            outputDiv.style.display = 'block';
+            outputDiv.innerHTML = `
+                <h3>Results:</h3>
+                <p><strong>Prime Number (p):</strong> ${p}</p>
+                <p><strong>Primitive Root (g):</strong> ${g}</p>
+                <p><strong>Alice's Public Key (A):</strong> ${A}</p>
+                <p><strong>Bob's Public Key (B):</strong> ${B}</p>
+                <p><strong>Key (K):</strong> <br> Alice's Key = ${K_alice} <br> Bob' Key = ${K_bob}</p>
+            `;
+        }
+
+
+    </script>
+</body>
+</html>

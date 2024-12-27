@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paillier Algorithm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Paillier Algorithm</h1>
+        <label for="p">Prime Number p:</label>
+        <input type="number" id="p" placeholder="Enter a prime number">
+
+        <label for="q">Prime Number q:</label>
+        <input type="number" id="q" placeholder="Enter a prime number">
+
+        <label for="plaintext">Plaintext:</label>
+        <textarea id="plaintext" placeholder="Enter your message"></textarea>
+
+        <button onclick="processPaillier()">Process Paillier</button>
+
+        <div id="output" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Fungsi untuk mengecek apakah sebuah bilangan adalah bilangan prima
+        function isPrime(num) {
+            if (num < 2) return false;
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) return false;
+            }
+            return true;
+        }
+
+        // Mencari nilai GCD
+        function gcd(a, b) {
+            while (b) {
+                [a, b] = [b, a % b];
+            }
+            return a;
+        }
+
+        // Mencari LCM
+        function lcm(a, b) {
+            return (a * b) / gcd(a, b);
+        }
+
+        // Eksponensial modular
+        function modExp(base, exp, mod) {
+            let result = 1;
+            base = base % mod;
+            while (exp > 0) {
+                if (exp % 2 === 1) result = (result * base) % mod;
+                exp = Math.floor(exp / 2);
+                base = (base * base) % mod;
+            }
+            return result;
+        }
+
+        // Fungsi L(x) = (x-1) / n
+        function L(x, n) {
+            return Math.floor((x - 1) / n);
+        }
+
+        // Modular Inverse using Extended Euclidean Algorithm
+        function modInverse(a, m) {
+            let m0 = m, t, q;
+            let x0 = 0, x1 = 1;
+
+            if (m === 1) return 0;
+
+            while (a > 1) {
+                q = Math.floor(a / m);
+                t = m;
+
+                m = a % m;
+                a = t;
+                t = x0;
+
+                x0 = x1 - q * x0;
+                x1 = t;
+            }
+
+            if (x1 < 0) x1 += m0;
+
+            return x1;
+        }
+
+        // Generate public and private keys
+        function generateKeys(p, q) {
+            const n = p * q;
+            const lambda = lcm(p - 1, q - 1);
+            let g = n + 1; // Common choice for g is n + 1
+            const mu = modInverse(L(modExp(g, lambda, n * n), n), n); // Calculate mu using modular inverse
+            return {
+                publicKey: { g, n },
+                privateKey: { lambda, mu }
+            };
+        }
+
+        // Encrypt a message
+        function encrypt(publicKey, m) {
+            const { g, n } = publicKey;
+            let r = Math.floor(Math.random() * (n - 1)) + 1; // Random r < n
+            while (gcd(r, n) !== 1) {
+                r = Math.floor(Math.random() * (n - 1)) + 1; // Find r until gcd(r, n) = 1
+            }
+            return (modExp(g, m, n * n) * modExp(r, n, n * n)) % (n * n);
+        }
+
+        // Decrypt a ciphertext
+        function decrypt(privateKey, c, publicKey) {
+            const { lambda, mu } = privateKey;
+            const { n } = publicKey;
+            const x = L(modExp(c, lambda, n * n), n);
+            return (x * mu) % n;
+        }
+
+        // Convert plaintext to ASCII
+        function textToAscii(text) {
+            return text.split('').map(char => char.charCodeAt(0));
+        }
+
+        // Convert ASCII to plaintext
+        function asciiToText(asciiArray) {
+            return asciiArray.map(code => String.fromCharCode(code)).join('');
+        }
+
+        // Encrypt ASCII array
+        function encryptAsciiArray(publicKey, asciiArray) {
+            return asciiArray.map(charCode => encrypt(publicKey, charCode));
+        }
+
+        // Decrypt ASCII array
+        function decryptAsciiArray(privateKey, ciphertextArray, publicKey) {
+            return ciphertextArray.map(ciphertext => decrypt(privateKey, ciphertext, publicKey));
+        }
+
+        function processPaillier() {
+            const p = parseInt(document.getElementById("p").value);
+            const q = parseInt(document.getElementById("q").value);
+            const plaintext = document.getElementById("plaintext").value;
+
+            if (!p || !q || !plaintext) {
+                alert("Please fill all fields.");
+                return;
+            }
+
+            if (!isPrime(p) || !isPrime(q)) {
+                alert("Both p and q must be prime numbers!");
+                return;
+            }
+
+            const keys = generateKeys(p, q);
+            const publicKey = keys.publicKey;
+            const privateKey = keys.privateKey;
+
+            // Convert plaintext to ASCII array
+            const asciiArray = textToAscii(plaintext);
+
+            // Encrypt ASCII array
+            const encryptedAscii = encryptAsciiArray(publicKey, asciiArray);
+
+            // Decrypt ASCII array back to plaintext
+            const decryptedAscii = decryptAsciiArray(privateKey, encryptedAscii, publicKey);
+            const decryptedText = asciiToText(decryptedAscii);
+
+            const outputDiv = document.getElementById("output");
+            outputDiv.style.display = "block";
+            outputDiv.innerHTML = `
+                <h3>Results:</h3>
+                <p><strong>Public Key (g, n) = </strong>(${publicKey.g}, ${publicKey.n})</p>
+                <p><strong>Private Key (λ, μ) = </strong>(${privateKey.lambda}, ${privateKey.mu})</p>
+                <p><strong>Original Plaintext:</strong> ${plaintext}</p>
+                <p><strong>ASCII Representation:</strong> ${asciiArray.join(', ')}</p>
+                <p><strong>Encrypted ASCII:</strong> ${encryptedAscii.join(', ')}</p>
+                <p><strong>Decrypted Plaintext:</strong> ${decryptedText}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

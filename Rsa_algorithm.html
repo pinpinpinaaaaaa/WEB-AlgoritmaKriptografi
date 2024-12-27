@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSA Encryption/Decryption</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RSA Encryption/Decryption</h1>
+        <label for="p">Prime Number p:</label>
+        <input type="number" id="p" placeholder="Enter a prime number">
+
+        <label for="q">Prime Number q:</label>
+        <input type="number" id="q" placeholder="Enter a prime number">
+
+        <label for="plaintext">Plaintext:</label>
+        <textarea id="plaintext" placeholder="Enter your message"></textarea>
+
+        <button onclick="processRSA()">Process RSA</button>
+
+        <div id="output" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Fungsi untuk mengecek apakah sebuah bilangan adalah bilangan prima
+        function isPrime(num) {
+            if (num < 2) return false; // Bilangan < 2 bukan prima
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) return false; // Jika habis dibagi angka selain 1 dan dirinya, bukan prima
+            }
+            return true;
+        }
+
+        // Mencari nilai GCD (Greatest Common Divisor)
+        function gcd(a, b) {
+            while (b) {
+                [a, b] = [b, a % b];
+            }
+            return a;
+        }
+
+        // Fungsi untuk mencari kunci privat (d) dengan metode modular inverse
+        function findPrivateKey(e, m) {
+            let k = 1;
+            while (true) {
+                let d = (1 + k * m) / e;
+                if (Number.isInteger(d)) return d;
+                k++;
+            }
+        }
+
+        // Fungsi untuk eksponensial modular
+        function modExp(base, exp, mod) {
+            let result = 1;
+            base = base % mod;
+            while (exp > 0) {
+                if (exp % 2 === 1) result = (result * base) % mod; // Jika eksp masih ada sisa
+                exp = Math.floor(exp / 2);
+                base = (base * base) % mod; // Kuadratkan base
+            }
+            return result;
+        }
+
+        function processRSA() {
+            // Langkah 1: Masukkan dua bilangan prima p dan q
+            const p = parseInt(document.getElementById("p").value); // Bilangan prima pertama
+            const q = parseInt(document.getElementById("q").value); // Bilangan prima kedua
+            const plaintext = document.getElementById("plaintext").value; // Teks yang akan dienkripsi
+
+            if (!p || !q || !plaintext) {
+                alert("Please fill all fields.");
+                return;
+            }
+
+            // Validasi apakah p dan q adalah bilangan prima
+            if (!isPrime(p) || !isPrime(q)) {
+                alert("Both p and q must be prime numbers!");
+                return;
+            }
+
+            // Langkah 2: Hitung nilai n dan m
+            const n = p * q; // n = p * q, modulus yang digunakan untuk kunci publik dan privat
+            const m = (p - 1) * (q - 1); // m = (p-1) * (q-1), totient Euler
+
+            // Langkah 3: Temukan e sebagai eksponen kunci publik
+            let e = 2; // Mulai dengan e = 2
+            while (e < m && gcd(e, m) !== 1) { // e harus relatif prima terhadap m
+                e++;
+            }
+
+            // Langkah 4: Temukan d sebagai kunci privat
+            const d = findPrivateKey(e, m); // d dihitung sebagai invers modular dari e terhadap m
+
+            // Langkah 5: Ubah plaintext menjadi nilai ASCII untuk enkripsi
+            const asciiValues = plaintext.split('').map(char => char.charCodeAt(0)); // Mengubah tiap karakter jadi kode ASCII
+
+            // Langkah 6: Enkripsi plaintext
+            // C = (M^e) mod n, dilakukan untuk setiap karakter
+            const encrypted = asciiValues.map(val => {
+                return val.toString().split('').map(digit => {
+                    return modExp(parseInt(digit), e, n); // Lakukan eksponensial modular untuk enkripsi
+                }).join('.');
+            });
+
+            // Langkah 7: Dekripsi ciphertext
+            // M = (C^d) mod n, dilakukan untuk setiap karakter
+            const decrypted = encrypted.map(enc => {
+                const digits = enc.split('.').map(digit => modExp(parseInt(digit), d, n)); // Eksponensial modular untuk dekripsi
+                return String.fromCharCode(parseInt(digits.join(''))); // Ubah kembali ke karakter dari kode ASCII
+            });
+
+            // Langkah 8: Tampilkan hasilnya
+            const outputDiv = document.getElementById("output");
+            outputDiv.style.display = "block";
+            outputDiv.innerHTML = `
+                <h3>Results:</h3>
+                <p><strong>n = p.q = </strong> ${p}.${q} = ${n}</p>
+                <p><strong>m = (p-1)(q-1) = </strong> (${p}-1)(${q}-1) = ${m}</p>
+                <p><strong>Public Key = (e,n) = </strong> (${e},${n}) </p>
+                <p><strong>Private Key = (d,n) = </strong> (${d},${n})</p>
+                <p><strong>Encrypted:</strong> ${encrypted.join(', ')}</p>
+                <p><strong>Decrypted:</strong> ${decrypted.join('')}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

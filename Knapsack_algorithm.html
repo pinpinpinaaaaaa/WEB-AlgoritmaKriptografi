@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knapsack Encryption/Decryption</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Knapsack Encryption/Decryption</h1>
+
+        <label for="plaintext">Plaintext:</label>
+        <textarea id="plaintext" placeholder="Enter your message"></textarea>
+
+        <button onclick="processKnapsack()">Encrypt & Decrypt</button>
+
+        <div id="output" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Langkah 1: Membuat Superincreasing Sequence
+        // Fungsi ini menghasilkan array superincreasing berdasarkan panjang yang diminta.
+        function generateSuperIncreasingSequence(length, start = 1) {
+            const sequence = [start];
+            for (let i = 1; i < length; i++) {
+                sequence.push(sequence.reduce((a, b) => a + b) + Math.floor(Math.random() * 10 + 1));
+            }
+            return sequence;
+        }
+        
+        // Langkah 2: Menghitung GCD (Greatest Common Divisor)
+        // Digunakan untuk memastikan bahwa n dan m adalah coprime (relatif prima).
+        function gcd(a, b) {
+            while (b) {
+                [a, b] = [b, a % b];
+            }
+            return a;
+        }
+
+        // Langkah 3: Membuat Public Key dan Private Key
+        // Public key dihitung dengan mengalikan sequence superincreasing dengan n modulo m.
+        function generateKeys(sequence) {
+            const m = sequence.reduce((a, b) => a + b) + Math.floor(Math.random() * 20 + 10); // m lebih besar dari jumlah elemen sequence.
+            let n;
+            do {
+                n = Math.floor(Math.random() * (m - 2) + 2); // n adalah bilangan acak dalam rentang [2, m-1].
+            } while (gcd(n, m) !== 1); // Pastikan n dan m adalah coprime.
+
+            const publicKey = sequence.map(s => (s * n) % m);
+            return { publicKey, privateKey: { sequence, n, m } };
+        }
+
+        // Langkah 4: Menghitung Modular Inverse secara manual
+        // Fungsi ini mencari nilai k dan inverse dari n (modular inverse).
+        function modInverse(n, m) {
+            let k = 0;
+            while (true) {
+                const potentialInverse = (1 + k * m) / n; // Mencoba mencari nilai inverse
+                if (Number.isInteger(potentialInverse)) { // Cek apakah hasilnya bilangan bulat
+                    return { inverse: potentialInverse, k };// Jika iya, kembalikan nilai inverse dan k
+                }
+                k++; // Jika tidak, tambah k dan coba lagi
+            }
+        }
+
+        // Langkah 5: Proses Enkripsi
+        // Mengubah plaintext ke biner, membagi biner menjadi blok, dan mengenkripsinya menggunakan public key.
+        function encrypt(plaintext, publicKey) {
+            // konversi teks ke representasi biner
+            const binary = plaintext
+                .split('')
+                .map(char => char.charCodeAt(0).toString(2).padStart(8, '0'))
+                .join('');
+            
+            // Membagi biner menjadi blok sebesar panjang public key.
+            const blocks = binary.match(new RegExp(`.{1,${publicKey.length}}`, 'g')).map(block => block.padEnd(publicKey.length, '0'));
+
+            //Mengenkripsi setiap blok biner.
+            const ciphertext = blocks.map(block => {
+                return block.split('').reduce((sum, bit, index) => sum + (bit === '1' ? publicKey[index] : 0), 0);
+            });
+
+            return { ciphertext, binaryBlocks: blocks };
+        }
+
+        // Langkah 6: Proses Dekripsi
+        // Menggunakan modular inverse untuk mendekripsi ciphertext menjadi biner, lalu mengubahnya kembali menjadi plaintext.
+        function decrypt(ciphertext, privateKey) {
+            const { sequence, n, m } = privateKey;
+            const { inverse: nInverse, k } = modInverse(n, m);
+
+            //dekripsi setiap elemen chipertext
+            const binaryBlocks = ciphertext.map(value => {
+                const decryptedValue = (value * nInverse) % m;
+                const blockBits = Array(sequence.length).fill('0');
+
+                //menemukan bit yang sesuai dengan nilai decryptedValue
+                let remainingValue = decryptedValue;
+                for (let i = sequence.length - 1; i >= 0; i--) {
+                    if (remainingValue >= sequence[i]) {
+                        blockBits[i] = '1';
+                        remainingValue -= sequence[i];
+                    }
+                }
+                return blockBits.join('');
+            });
+
+            // Gabungkan blok biner menjadi string biner penuh dan ubah menjadi teks.
+            const binary = binaryBlocks.join('');
+            const plaintext = binary.match(/.{8}/g).map(byte => String.fromCharCode(parseInt(byte, 2))).join('');
+
+            return { plaintext, binaryBlocks, nInverse, k };
+        }
+
+        // Langkah 7: Proses Enkripsi dan Dekripsi
+        // Fungsi utama untuk menjalankan proses lengkap dari enkripsi hingga dekripsi.
+        function processKnapsack() {
+            const plaintext = document.getElementById('plaintext').value;
+            if (!plaintext) {
+                alert('Please enter plaintext.');
+                return;
+            }
+
+            // Langkah 1: Generate superincreasing sequence.
+            const sequence = generateSuperIncreasingSequence(8);
+            
+            // Langkah 2: Generate public and private keys.
+            const { publicKey, privateKey } = generateKeys(sequence);
+
+            // Langkah 3: Encrypt plaintext menggunakan public key.
+            const { ciphertext, binaryBlocks: encryptedBlocks } = encrypt(plaintext, publicKey);
+            
+            // Langkah 4: Decrypt ciphertext menggunakan private key.
+            const { plaintext: decryptedText, binaryBlocks: decryptedBlocks, nInverse, k } = decrypt(ciphertext, privateKey);
+
+            // Tampilkan hasil di HTML.
+            const outputDiv = document.getElementById('output');
+            outputDiv.style.display = 'block';
+            outputDiv.innerHTML = `
+                <h3>Results:</h3>
+                <p><strong>Superincreasing Sequence (Private Key):</strong> ${sequence.join(', ')}</p>
+                <p><strong>Public Key:</strong> ${publicKey.join(', ')}</p>
+                <p><strong>n:</strong> ${privateKey.n}</p>
+                <p><strong>m:</strong> ${privateKey.m}</p>
+                <p><strong>Encrypted Binary Blocks:</strong> <br> ${encryptedBlocks.join('<br>')}</p>
+                <p><strong>Ciphertext:</strong> ${ciphertext.join(', ')}</p>
+                <p><strong>k:</strong> ${k}</p>
+                <p><strong>Modular Inverse (n⁻¹):</strong> ${nInverse}</p>
+                <p><strong>Decrypted Text:</strong> ${decryptedText}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElGamal Encryption/Decryption</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ElGamal Encryption/Decryption</h1>
+        <label for="prime">Prime Number p:</label>
+        <input type="number" id="prime" placeholder="Enter a prime number > 127">
+
+        <label for="plaintext">Plaintext:</label>
+        <textarea id="plaintext" placeholder="Enter your message"></textarea>
+
+        <button onclick="processElGamal()">Process ElGamal</button>
+
+        <div id="output" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Fungsi untuk mengecek apakah sebuah bilangan adalah bilangan prima
+        function isPrime(num) {
+            if (num < 2) return false; // Bilangan < 2 bukan prima
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) return false; // Jika habis dibagi angka selain 1 dan dirinya, bukan prima
+            }
+            return true;
+        }
+
+        // Fungsi untuk menghitung GCD (Greatest Common Divisor) antara dua angka
+        function gcd(a, b) {
+            while (b) {
+                [a, b] = [b, a % b]; //Hitung sisa bagi hingga b = 0
+            }
+            return a; // Langkah 2: Kembalikan GCD
+        }
+
+        // Fungsi untuk menghitung (base^exp) % mod menggunakan eksponen modular
+        function modExp(base, exp, mod) {
+            let result = 1; // Langkah 1: Inisialisasi hasil awal
+            base = base % mod; // Langkah 2: Pastikan base dalam batas mod
+            while (exp > 0) {
+                if (exp % 2 === 1) result = (result * base) % mod; // Langkah 3: Kalikan jika eksp adalah bilangan ganjil
+                exp = Math.floor(exp / 2); // Langkah 4: Bagi dua eksp
+                base = (base * base) % mod; // Langkah 5: Kuadratkan base
+            }
+            return result; // Langkah 6: Kembalikan hasil akhir
+        }
+
+        // Fungsi untuk menghitung invers modular a (mod p) dengan aturan (a^(p-2)) % p
+        function modInverse(a, p) {
+            return modExp(a, p - 2, p); // Menggunakan eksponen modular
+        }
+
+        // Fungsi untuk menghasilkan kunci private (x) secara acak
+        function genKey(q) {
+            let key;
+            do {
+                key = Math.floor(Math.random() * (q - 2)) + 2; // Langkah 1: Pilih key random antara 2 dan q-
+            } while (gcd(q, key) !== 1); // Langkah 2: Pastikan key relatif prima terhadap q
+            return key; // Langkah 3: Kembalikan key
+        }
+
+        // Fungsi untuk menemukan akar primitif dari bilangan prima p
+        function findPrimitiveRoot(p) {
+            const phi = p - 1; // Langkah 1: Hitung nilai φ(p) = p-1
+            const factors = [];
+
+            let n = phi;
+            for (let i = 2; i * i <= n; i++) { // Langkah 2: Cari faktor dari φ(p)
+                if (n % i === 0) {
+                    factors.push(i); // Tambahkan faktor pembagi
+                    while (n % i === 0) n /= i; // Bagi habis dengan faktor
+                }
+            }
+            if (n > 1) factors.push(n); // Tambahkan faktor sisa (jika ada)
+
+            for (let g = 2; g < p; g++) { // Langkah 3: Coba setiap nilai g
+                let isPrimitive = true;
+                for (const factor of factors) { // Periksa apakah g adalah akar primitif
+                    if (modExp(g, phi / factor, p) === 1) {
+                        isPrimitive = false;
+                        break;
+                    }
+                }
+                if (isPrimitive) return g; // Langkah 4: Kembalikan g jika akar primitif
+            }
+            return -1; // Tidak ditemukan akar primitif
+        }
+
+        // Fungsi untuk mengenkripsi pesan
+        function encrypt(msg, p, g, y) {
+            const encrypted = []; // Untuk menyimpan pasangan (a, b)
+            const details = []; // Untuk menyimpan detail proses setiap karakter
+            for (let i = 0; i < msg.length; i++) {
+                const m = msg.charCodeAt(i); // Langkah 1: Konversi karakter ke kode ASCII
+                const k = Math.floor(Math.random() * (p - 2)) + 1; // Langkah 2: Pilih k acak
+                const a = modExp(g, k, p); // Langkah 3: Hitung a = g^k mod p
+                const b = (modExp(y, k, p) * m) % p; // Langkah 4: Hitung b = (y^k * m) mod p
+                encrypted.push([a, b]); // Simpan pasangan (a, b)
+                details.push({ n: i + 1, m, k, a, b }); // Simpan detail proses
+            }
+            return { encrypted, details }; // Kembalikan hasil enkripsi dan detail
+        }
+
+        // Fungsi untuk mendekripsi pesan terenkripsi
+        function decrypt(encrypted, p, x) {
+            let decrypted = ""; // Untuk menyimpan pesan hasil dekripsi
+            for (const [a, b] of encrypted) {
+                const axInverse = modExp(a, p - 1 - x, p); // (a^x)^-1 = a^(p-1-x) mod p
+                const m = (b * axInverse) % p; // m = (b * (a^x)^-1) mod p
+                const validM = (m < 32 || m > 126) ? 63 : m; // Validasi ASCII (ganti dengan '?' jika invalid)
+                decrypted += String.fromCharCode(validM); // Konversi m ke karakter ASCII
+            }
+
+            return decrypted; // Kembalikan hasil dekripsi
+        }
+
+
+        // Fungsi utama untuk menjalankan proses ElGamal
+        function processElGamal() {
+            const p = parseInt(document.getElementById("prime").value); // Langkah 1: Ambil bilangan prima p dari input
+            const plaintext = document.getElementById("plaintext").value; // Langkah 2: Ambil plaintext dari input
+
+            if (!p || !plaintext) {
+                alert("Please fill all fields."); // Validasi input
+                return;
+            }
+
+            // Validasi apakah p dan q adalah bilangan prima
+            if (!isPrime(p)) {
+                alert("p must be prime numbers!");
+                return;
+            }
+
+            const g = findPrimitiveRoot(p); // Langkah 3: Temukan akar primitif g dari p
+            if (g === -1) {
+                alert("No primitive root found for the given prime number."); // Validasi akar primitif
+                return;
+            }
+
+            const x = genKey(p); // Langkah 4: Hasilkan kunci privat x
+            const y = modExp(g, x, p); // Langkah 5: Hitung kunci publik y = g^x mod p
+
+            const { encrypted, details } = encrypt(plaintext, p, g, y); // Langkah 6: Lakukan enkripsi pesan
+
+            const decrypted = decrypt(encrypted, p, x); // Langkah 7: Lakukan dekripsi pesan
+
+            const outputDiv = document.getElementById("output"); // Langkah 8: Tampilkan hasil ke pengguna
+            outputDiv.style.display = "block";
+            outputDiv.innerHTML = `
+                <h3>Results:</h3>
+                <p><strong>Prime (p):</strong> ${p}</p>
+                <p><strong>Generator (g):</strong> ${g}</p>
+                <p><strong>Private Key (x):</strong> ${x}</p>
+                <p><strong>Public Key (y):</strong> ${y}</p>
+                <p><strong>Details process Encryption:</strong></p>
+                <table border="1" style="width: 100%; text-align: left;">
+                    <tr><th>n</th><th>m(n)</th><th>k(n)</th><th>a(n)</th><th>b(n)</th></tr>
+                    ${details.map(d => `<tr><td>${d.n}</td><td>${d.m}</td><td>${d.k}</td><td>${d.a}</td><td>${d.b}</td></tr>`).join('')}
+                </table>
+                <p><strong>Encrypted:</strong> ${encrypted.map(pair => `(${pair[0]}, ${pair[1]})`).join(', ')}</p>
+                <p><strong>Decrypted:</strong> ${decrypted}</p>
+            `;
+        }
+    </script>
+</body>
+</html>
